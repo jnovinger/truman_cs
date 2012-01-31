@@ -6,15 +6,27 @@ Oriented Programming.
 """
 
 from random import randint
-from time import sleep
+from subprocess import Popen
 from pdb import set_trace
+import time
 
-DEBUG = False
 def debug(text):
     if DEBUG:
         print text
 
 MOVES = [(1, 0), (0, 1), (-1, 0), (0, -1)]
+
+def shuffle(moves):
+    order = []
+    while len(moves) > 0:
+        if len(moves) == 1:
+            item = 0
+        else:
+            item = randint(0, len(moves) - 1)
+        order.append(moves[item])
+        del(moves[item])
+    return order
+
 
 class Bug():
     """ Base class for all bug types, provides common behaviors """
@@ -90,6 +102,7 @@ class Grid():
 
     def display(self):
         """ Draw the map of the grid """
+        #Popen("clear")
         self._build_grid()
         for y in xrange(self._height):
             line = ''
@@ -106,7 +119,8 @@ class Grid():
 
     def game_over(self):
         if len(self.ants) == 0 or len(self.doodlebugs) == 0:
-            debug("Game over!")
+            if not DISPLAY_TURN:
+                self.display()
             return True
         else:
             return False
@@ -153,7 +167,7 @@ class Grid():
             offset = dbug.move()
             new_loc = (location[0] + offset[0], location[1] + offset[1])
 
-            if dbug.hunger >= 3:
+            if dbug.hunger >= DBUG_HUNGER_LIMIT:
                 del(self.doodlebugs[location])
                 continue
 
@@ -178,7 +192,7 @@ class Grid():
             self.doodlebugs[new_loc] = dbug
 
             # see if we need to breed
-            if dbug.age % 5 == 0:
+            if dbug.age % DBUG_BREED_INTERVAL == 0:
                 self._build_grid()
                 offset = dbug.move()
                 new_pos = (location[0] + offset[0], location[1] + offset[1])
@@ -207,7 +221,7 @@ class Grid():
             self.ants[new_loc] = ant
 
             # see if we need to brred
-            if ant.age % 3 == 0:
+            if ant.age % ANT_BREED_INTERVAL == 0:
                 self._build_grid()
                 offset = ant.move()
                 new_ant_pos = (location[0] + offset[0], location[1] + offset[1])
@@ -216,16 +230,23 @@ class Grid():
                 if new_ant_pos not in self.world:
                     self.add(Ant(), new_ant_pos)
 
-        self.display()
+        if DISPLAY_TURN:
+            self.display()
+
+        if TURN_PROMPT:
+            try:
+                s = raw_input('Press enter to continue')
+            except:
+                pass
 
 
 class World:
     """ Represents the world that our bugs live in """
 
-    def __init__(self, width=20, height=20, sleep=0.1, ants=100, doodlebugs=5):
+    def __init__(self, width=20, height=20, turn_sleep=0.1, ants=100, doodlebugs=5):
         """ Constructor, let's get this going """
         self.grid = Grid(width, height)
-        self.sleep = sleep
+        self.sleep = turn_sleep
 
         # populate grid with bugs
         for ant in range(ants):
@@ -237,21 +258,45 @@ class World:
         self.grid.display()
 
     def run(self):
-        begin_count = float(len(self.grid.ants) + len(self.grid.doodlebugs))
+        dbug_count = float(len(self.grid.doodlebugs))
+
+        begin_count = float(len(self.grid.ants) + dbug_count)
         try:
             while not self.grid.game_over():
                 cur_count = len(self.grid.ants) + len(self.grid.doodlebugs)
-                if self.sleep:
-                    sleep(self.sleep)
+                #self.sleep = min(len(self.grid.doodlebugs) / dbug_count, 0.5)
+                time.sleep(self.sleep)
                 self.grid.turn()
         except KeyboardInterrupt:
             print "Bye!"
 
+""" Begin Parameters """
+width = 20
+height = 20
+sleep = 0
 
-width = 45
-height = 45
-ratio = (width * height) / 400
+ANT_BREED_INTERVAL = 3
+DBUG_HUNGER_LIMIT = 3
+DBUG_BREED_INTERVAL = 8
+""" End Parameters """
 
-world = World(width, height, 0, int(100 * ratio), int(5 * ratio))
-#world = World()
+""" Begin Program Behaviors """
+# Display the world after every turn?
+DISPLAY_TURN = True
+# Print debugging messages?
+DEBUG = False
+# Prompt user after every turn?
+TURN_PROMPT = True
+""" End Program Behaviors """
+
+# Some math to ensure that the world is filled with the original ant and dbug
+# density
+ant_density = 0.25
+dbug_density = 0.0125
+cells = width * height
+ants = int(cells * ant_density)
+dbugs = int(cells * dbug_density)
+
+# Go, go, go!
+world = World(width, height, sleep, ants, dbugs)
 world.run()
